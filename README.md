@@ -5,14 +5,16 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plug
 ## Requirements
 
 - Node.js ≥ 22 (or ≥ 24), pnpm ≥ 10, and a working `dsh` installation
-- A ZCode installation whose CLI bundle can run headless, e.g. macOS: `/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs`
-- ZCode login completed on the machine: `~/.zcode/cli/config.json` must declare an explicit model provider (the shape `zcode login` writes). Without it the app-server exits with "Model config is missing".
+- A ZCode installation whose CLI bundle can run headless, e.g. macOS: `/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs`; Windows (ZCode desktop): `D:\soft\zcode\resources\glm\zcode.cjs`
+- A model provider reachable from `~/.zcode/cli/config.json`. Without it the app-server exits with "Model config is missing" — see [Login and model config](#login-and-model-config) for the exact file shape.
 
 ## Install
 
 ```sh
 dsh plugin --profile <name> add github:whyiyhw/dsh-subagent-zcode
 ```
+
+Install into an existing, working profile. `plugin add` against a brand-new profile name creates a profile whose bundles list only `@deepseek-ai/dsh-base` plus this plugin — no app layer — so booting it hangs with no consumer for the prompt. If you must start from a fresh profile, first add an app bundle such as `@deepseek-ai/dsh-headless` to `dsh.profile.bundles` in the profile's `package.json` (or boot the profile once before adding the plugin).
 
 pnpm ≥ 10 blocks a git dependency's `prepare` build script until allowed. The first `add` fails; copy the exact key pnpm printed (for this repo it looks like `dsh-subagent-zcode@https://codeload.github.com/...`) into the profile's `pnpm-workspace.yaml`:
 
@@ -41,20 +43,55 @@ The bundle registers a dormant provider. Point it at the ZCode CLI bundle and ex
     # env: {}                      # explicit child environment overlay
     # disposeGraceMs: 3000
 
-- id: tool-subagent-zcode
-  name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: zcode
-    toolName: subagent_zcode
-    backgroundMode: one-shot
-    maxDepth: provider-managed
+- insert:
+    - id: tool-subagent-zcode
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: zcode
+        toolName: subagent_zcode
+        backgroundMode: one-shot
+        maxDepth: provider-managed
 ```
+
+The provider row overrides the entry the bundle itself inserts, so a plain `- id:` patch is correct for it. The tool row creates a **new** entry and must use `- insert:` — a plain `- id:` patch against an id that does not exist yet is a silent no-op and the model never sees the `subagent_zcode` tool.
 
 Verify the layer, then boot:
 
 ```sh
 dsh --profile <name> --dump-config   # shows a "# == dsh-subagent-zcode" layer
 dsh --profile <name>
+```
+
+## Login and model config
+
+The app-server reads only `~/.zcode/cli/config.json`. `zcode login` writes it in the shape below; on machines where login state lives elsewhere the file must be assembled by hand:
+
+- ZCode desktop 3.x stores its provider table in `~/.zcode/v2/config.json` — the CLI never reads that file.
+- The CLI file needs a top-level `provider` map (same entry structure as the v2 table: `name`, `kind`, `options.baseURL`, `options.apiKey`, `models`) plus a `model.main` reference in `"provider-id/model"` string form.
+- A provider entry with an empty `apiKey: ""` fails validation for the **whole file** (`config.file.invalid` in `~/.zcode/cli/log/zcode-*.jsonl`), leaving the run with "Model config is missing" even though a valid provider is also present. Copy over only the providers that carry a real key.
+
+Minimal working example (BigModel coding plan):
+
+```json
+{
+  "provider": {
+    "builtin:bigmodel-coding-plan": {
+      "name": "BigModel - Coding Plan",
+      "kind": "anthropic",
+      "options": {
+        "apiKey": "<key>",
+        "baseURL": "https://open.bigmodel.cn/api/anthropic"
+      }
+    }
+  },
+  "model": { "main": "builtin:bigmodel-coding-plan/GLM-5.3" }
+}
+```
+
+Sanity-check the setup before wiring the plugin — a plain headless prompt exercises the same config path:
+
+```sh
+node /path/to/zcode.cjs --prompt "Reply with exactly: ZCODE-OK"
 ```
 
 ## What you get
