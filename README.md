@@ -14,14 +14,14 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh) plug
 dsh plugin --profile <name> add github:whyiyhw/dsh-subagent-zcode
 ```
 
-pnpm ≥ 10 blocks a git dependency's `prepare` build script until allowed. The first `add` fails; copy the exact package key pnpm printed into the profile's `pnpm-workspace.yaml`:
+pnpm ≥ 10 blocks a git dependency's `prepare` build script until allowed. The first `add` fails; copy the exact key pnpm printed (for this repo it looks like `dsh-subagent-zcode@https://codeload.github.com/...`) into the profile's `pnpm-workspace.yaml`:
 
 ```yaml
 allowBuilds:
-  dsh-subagent-zcode: true
+  dsh-subagent-zcode@https://codeload.github.com/whyiyhw/dsh-subagent-zcode/tar.gz/<sha>: true
 ```
 
-then re-run the `add`. Pin a commit for a reproducible install:
+then re-run the `add`. Allowing the build is permission to execute this package's code on your machine at install time — pin a commit for a reproducible install:
 
 ```sh
 dsh plugin --profile <name> add github:whyiyhw/dsh-subagent-zcode#<sha>
