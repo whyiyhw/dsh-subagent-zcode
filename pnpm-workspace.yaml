@@ -1,0 +1,6 @@
+# Mirrors the pnpm settings a dsh profile uses, so plain `pnpm install` here
+# does not try to auto-install the @deepseek-ai peers from the registry.
+packages:
+  - .
+
+autoInstallPeers: false
